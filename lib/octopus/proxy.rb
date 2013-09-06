@@ -1,7 +1,6 @@
 require "set"
 
 class Octopus::Proxy
-  attr_accessor :config
 
   def initialize(config = Octopus.config)
     initialize_shards(config)
@@ -9,21 +8,53 @@ class Octopus::Proxy
   end
 
   def initialize_shards(config)
+    @config_changed = true
+    @config_data = config
+  end
+
+  def shards
+    evaluate_config
+    @shards
+  end
+
+  def groups
+    evaluate_config
+    @groups
+  end
+
+  def adapters
+    evaluate_config
+    @adapters
+  end
+
+  def config
+    evaluate_config
+    @config
+  end
+
+  def verify_connection
+    evaluate_config
+    @verify_connection
+  end
+
+  def evaluate_config
+    return if defined?(@config_changed) && @config_changed == false
+    @config_changed = false
+
     @shards = HashWithIndifferentAccess.new
     @groups = {}
     @adapters = Set.new
     @shards[:master] = ActiveRecord::Base.connection_pool_without_octopus()
     @config = ActiveRecord::Base.connection_pool_without_octopus.connection.instance_variable_get(:@config)
 
-    if !config.nil? && config.has_key?("verify_connection")
-      @verify_connection = config["verify_connection"]
+    if !@config_data.nil? && @config_data.has_key?("verify_connection")
+      @verify_connection = @config_data["verify_connection"]
     else
       @verify_connection = false
     end
 
-    if !config.nil?
-      @entire_sharded = config['entire_sharded']
-      shards_config = config[Octopus.rails_env()]
+    if !@config_data.nil?
+      shards_config = @config_data[Octopus.rails_env()]
     end
 
     shards_config ||= []
@@ -60,7 +91,7 @@ class Octopus::Proxy
     else
       @fully_replicated = true
     end
-    @slaves_list = @shards.keys.map {|sym| sym.to_s}.sort
+    @slaves_list = shards.keys.map {|sym| sym.to_s}.sort
     @slaves_list.delete('master')
     @slave_index = 0
   end
@@ -79,9 +110,9 @@ class Octopus::Proxy
 
   def current_shard=(shard_symbol)
     if shard_symbol.is_a?(Array)
-      shard_symbol.each {|symbol| raise "Nonexistent Shard Name: #{symbol}" if @shards[symbol].nil? }
+      shard_symbol.each {|symbol| raise "Nonexistent Shard Name: #{symbol}" if shards[symbol].nil? }
     else
-      raise "Nonexistent Shard Name: #{shard_symbol}" if @shards[shard_symbol].nil?
+      raise "Nonexistent Shard Name: #{shard_symbol}" if shards[shard_symbol].nil?
     end
 
     Thread.current["octopus.current_shard"] = shard_symbol
@@ -121,14 +152,14 @@ class Octopus::Proxy
   #
   # Returns a boolean.
   def has_group?(group)
-    @groups.has_key?(group.to_s)
+    groups.has_key?(group.to_s)
   end
 
   # Public: Retrieves names of all loaded shards.
   #
   # Returns an array of shard names as symbols
   def shard_names
-    @shards.keys
+    shards.keys
   end
 
   # Public: Retrieves the defined shards for a given group.
@@ -136,21 +167,21 @@ class Octopus::Proxy
   # Returns an array of shard names as symbols or nil if the group is not
   # defined.
   def shards_for_group(group)
-    @groups.fetch(group.to_s, nil)
+    groups.fetch(group.to_s, nil)
   end
 
   def select_connection
-    @shards[shard_name].verify_active_connections! if @verify_connection
+    shards[shard_name].verify_active_connections! if verify_connection
     # Rails 3.1 sets automatic_reconnect to false when it removes
     # connection pool.  Octopus can potentially retain a reference to a closed
     # connection pool.  Previously, that would work since the pool would just
     # reconnect, but in Rails 3.1 the flag prevents this.
     if Octopus.rails_above_30?
-      if !@shards[shard_name].automatic_reconnect
-        @shards[shard_name].automatic_reconnect = true
+      if !shards[shard_name].automatic_reconnect
+        shards[shard_name].automatic_reconnect = true
       end
     end
-    @shards[shard_name].connection()
+    shards[shard_name].connection()
   end
 
   def shard_name
@@ -158,7 +189,7 @@ class Octopus::Proxy
   end
 
   def should_clean_table_name?
-    @adapters.size > 1
+    adapters.size > 1
   end
 
   def run_queries_on_shard(shard, &block)
@@ -221,7 +252,7 @@ class Octopus::Proxy
   end
 
   def connection_pool
-    return @shards[current_shard]
+    return shards[current_shard]
   end
 
   protected
@@ -240,7 +271,7 @@ class Octopus::Proxy
   end
 
   def initialize_adapter(adapter)
-    @adapters << adapter
+    adapters << adapter
     begin
       require "active_record/connection_adapters/#{adapter}_adapter"
     rescue LoadError

@@ -6,10 +6,10 @@ describe Octopus::Proxy do
   describe "creating a new instance", :shards => [] do
     it "should initialize all shards and groups" do
       # FIXME: Don't test implementation details
-      proxy.instance_variable_get(:@shards).should include("canada", "brazil", "master", "sqlite_shard", "russia", "alone_shard",
+      proxy.shards.should include("canada", "brazil", "master", "sqlite_shard", "russia", "alone_shard",
                                                            "aug2009", "postgresql_shard", "aug2010", "aug2011")
 
-      proxy.instance_variable_get(:@shards).should include("protocol_shard") if Octopus.rails_above_31?
+      proxy.shards.should include("protocol_shard") if Octopus.rails_above_31?
 
       proxy.has_group?("country_shards").should be_true
       proxy.shards_for_group("country_shards").should include(:canada, :brazil, :russia)
@@ -27,18 +27,18 @@ describe Octopus::Proxy do
     end
 
     it "should not verify connections for default" do
-      proxy.instance_variable_get(:@verify_connection).should be_false
+      proxy.verify_connection.should be_false
     end
 
     it "should work with thiking sphinx" do
-      config = proxy.instance_variable_get(:@config)
+      config = proxy.config
       config[:adapter].should == "mysql2"
       config[:database].should == "octopus_shard_1"
       config[:username].should == "root"
     end
 
     it 'should create a set with all adapters, to ensure that is needed to clean the table name.' do
-      adapters = proxy.instance_variable_get(:@adapters)
+      adapters = proxy.adapters
       adapters.should be_kind_of(Set)
       adapters.to_a.should =~ ["sqlite3", "mysql2", "postgresql"]
     end
@@ -87,7 +87,7 @@ describe Octopus::Proxy do
       end
 
       it "should raise the error" do
-        lambda { proxy }.should raise_error("You have duplicated shard names!")
+        lambda { proxy.shards }.should raise_error("You have duplicated shard names!")
       end
     end
 
@@ -97,7 +97,7 @@ describe Octopus::Proxy do
       end
 
       it "should initialize just the master shard" do
-        proxy.instance_variable_get(:@shards).keys.should == ["master"]
+        proxy.shards.keys.should == ["master"]
       end
 
       it "should not initialize replication" do
@@ -140,7 +140,7 @@ describe Octopus::Proxy do
       Octopus.config()
 
       proxy.instance_variable_get(:@replicated).should be_true
-      proxy.instance_variable_get(:@verify_connection).should be_true
+      proxy.verify_connection.should be_true
       Octopus.environments.should == ["staging", "production"]
     end
 
@@ -150,7 +150,7 @@ describe Octopus::Proxy do
       Octopus.instance_variable_set(:@environments, nil)
       Octopus.config()
 
-      proxy.instance_variable_get(:@shards).keys.to_set.should == Set.new(["slave1", "slave2", "master"])
+      proxy.shards.keys.to_set.should == Set.new(["slave1", "slave2", "master"])
     end
 
     it "should initialize correctly the shard octopus_shard value for logging" do
@@ -159,7 +159,7 @@ describe Octopus::Proxy do
       Octopus.instance_variable_set(:@environments, nil)
       Octopus.config()
 
-      proxy.instance_variable_get(:@shards)['slave1'].spec.config.should have_key :octopus_shard
+      proxy.shards['slave1'].spec.config.should have_key :octopus_shard
     end
 
     it "should initialize correctly the shards for the production environment" do
@@ -168,7 +168,7 @@ describe Octopus::Proxy do
       Octopus.instance_variable_set(:@environments, nil)
       Octopus.config()
 
-      proxy.instance_variable_get(:@shards).keys.to_set.should == Set.new(["slave3", "slave4", "master"])
+      proxy.shards.keys.to_set.should == Set.new(["slave3", "slave4", "master"])
     end
 
     describe "using the master connection", :shards => [:russia, :master]  do
@@ -229,12 +229,12 @@ describe Octopus::Proxy do
 
     describe "should return the connection based on shard_name" do
       it "when current_shard is empty" do
-        proxy.select_connection().should == proxy.instance_variable_get(:@shards)[:master].connection()
+        proxy.select_connection().should == proxy.shards[:master].connection()
       end
 
       it "when current_shard is a single shard" do
         proxy.current_shard = :canada
-        proxy.select_connection().should == proxy.instance_variable_get(:@shards)[:canada].connection()
+        proxy.select_connection().should == proxy.shards[:canada].connection()
       end
     end
   end
