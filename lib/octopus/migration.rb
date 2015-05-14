@@ -68,12 +68,12 @@ module Octopus
           alias_method_chain :up, :octopus
           alias_method_chain :down, :octopus
           alias_method_chain :run, :octopus
+          alias_method_chain :migrations, :octopus
         end
       end
 
       base.alias_method_chain :run, :octopus
       base.alias_method_chain :migrate, :octopus
-      base.alias_method_chain :migrations, :octopus
     end
 
     def run_with_octopus(&block)
@@ -86,14 +86,6 @@ module Octopus
       migrate_without_octopus(&block)
     rescue ActiveRecord::UnknownMigrationVersionError => e
       raise unless migrations(true).detect { |m| m.version == e.version }
-    end
-
-    def migrations_with_octopus(shard_agnostic = false)
-      connection = ActiveRecord::Base.connection
-      migrations = migrations_without_octopus
-      return migrations if !connection.is_a?(Octopus::Proxy) || shard_agnostic
-
-      migrations.select { |m| m.shards.include?(connection.current_shard.to_sym) }
     end
 
     module ClassMethods
@@ -131,6 +123,14 @@ module Octopus
         end
       end
 
+      def migrations_with_octopus(paths)
+        connection = ActiveRecord::Base.connection
+        migrations = migrations_without_octopus(paths)
+        return migrations if !connection.is_a?(Octopus::Proxy)
+
+        migrations.select { |m| m.shards.include?(connection.current_shard.to_sym) }
+      end
+
       private
 
       def connection
@@ -166,3 +166,4 @@ ActiveRecord::Migration.send(:include, Octopus::Migration)
 ActiveRecord::Migrator.send(:include, Octopus::Migrator)
 ActiveRecord::MigrationProxy.send(:include, Octopus::MigrationProxy)
 ActiveRecord::UnknownMigrationVersionError.send(:include, Octopus::UnknownMigrationVersionError)
+
