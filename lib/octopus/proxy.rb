@@ -73,7 +73,11 @@ module Octopus
         end
       end
 
-      @shards[:master] ||= ActiveRecord::Base.connection_pool_without_octopus
+      if !@shards[:master]
+        master_pool = ActiveRecord::Base.connection_pool_without_octopus
+        master_pool.automatic_reconnect = true
+        @shards[:master] = master_pool
+      end
     end
 
     def initialize_replication(config)
