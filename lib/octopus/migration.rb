@@ -65,12 +65,12 @@ module Octopus::Migrator
         alias_method_chain :up, :octopus
         alias_method_chain :down, :octopus
         alias_method_chain :run, :octopus
+        alias_method_chain :migrations, :octopus
       end
     end
 
     base.alias_method_chain :run, :octopus
     base.alias_method_chain :migrate, :octopus
-    base.alias_method_chain :migrations, :octopus
   end
 
   def run_with_octopus(&block)
@@ -85,15 +85,16 @@ module Octopus::Migrator
     raise unless migrations(true).find {|m| m.version == e.version}
   end
 
-  def migrations_with_octopus(shard_agnostic = false)
-    connection = ActiveRecord::Base.connection
-    migrations = migrations_without_octopus
-    return migrations if !connection.is_a?(Octopus::Proxy) || shard_agnostic
-
-    migrations.select {|m| m.shards.include?(connection.current_shard.to_sym)}
-  end
-
   module ClassMethods
+
+    def migrations_with_octopus(shard_agnostic = false)
+      connection = ActiveRecord::Base.connection
+      migrations = migrations_without_octopus
+      return migrations if !connection.is_a?(Octopus::Proxy) || shard_agnostic
+
+      migrations.select {|m| m.shards.include?(connection.current_shard.to_sym)}
+    end
+
     def migrate_with_octopus(migrations_paths, target_version = nil, &block)
       return migrate_without_octopus(migrations_paths, target_version, &block) unless connection.is_a?(Octopus::Proxy)
 
