@@ -2,24 +2,24 @@ require 'active_record'
 require 'active_support/version'
 require 'active_support/core_ext/class'
 
-require 'yaml'
-require 'erb'
+require "yaml"
+require "erb"
 
 module Octopus
-  def self.env
+  def self.env()
     @env ||= 'octopus'
   end
 
-  def self.rails_env
+  def self.rails_env()
     @rails_env ||= self.rails? ? Rails.env.to_s : 'shards'
   end
 
   def self.config
     @config ||= begin
-      file_name = Octopus.directory + '/config/shards.yml'
+      file_name = Octopus.directory() + "/config/shards.yml"
 
-      if File.exist?(file_name) || File.symlink?(file_name)
-        config ||= HashWithIndifferentAccess.new(YAML.load(ERB.new(File.read(file_name)).result))[Octopus.env]
+      if File.exists?(file_name) || File.symlink?(file_name)
+        config ||= HashWithIndifferentAccess.new(YAML.load(ERB.new(File.read(file_name)).result))[Octopus.env()]
       else
         config ||= HashWithIndifferentAccess.new
       end
@@ -45,7 +45,7 @@ module Octopus
 
   # Returns the Rails.root_to_s when you are using rails
   # Running the current directory in a generic Ruby process
-  def self.directory
+  def self.directory()
     @directory ||= defined?(Rails) ?  Rails.root.to_s : Dir.pwd
   end
 
@@ -57,25 +57,11 @@ module Octopus
   end
 
   def self.environments=(environments)
-    @environments = environments.map(&:to_s)
+    @environments = environments.map { |element| element.to_s }
   end
 
   def self.environments
     @environments ||= config['environments'] || ['production']
-  end
-
-  def self.robust_environments=(environments)
-    @robust_environments = environments.map(&:to_s)
-  end
-
-  # Environments in which to swallow failures from a single shard
-  # when iterating through all.
-  def self.robust_environments
-    @robust_environments ||= config['robust_environments'] || ['production']
-  end
-
-  def self.robust_environment?
-    robust_environments.include? rails_env
   end
 
   def self.rails3?
@@ -86,26 +72,12 @@ module Octopus
     ActiveRecord::VERSION::MAJOR >= 4
   end
 
-  def self.rails41?
-    rails4? && ActiveRecord::VERSION::MINOR >= 1
-  end
-
   def self.rails?
     defined?(Rails)
   end
 
-  attr_writer :logger
-
-  def self.logger
-    if defined?(Rails)
-      @logger ||= Rails.logger
-    else
-      @logger ||= Logger.new($stderr)
-    end
-  end
-
   def self.shards=(shards)
-    config[rails_env] = HashWithIndifferentAccess.new(shards)
+    config[rails_env()] = HashWithIndifferentAccess.new(shards)
     ActiveRecord::Base.connection.initialize_shards(@config)
   end
 
@@ -118,34 +90,28 @@ module Octopus
       yield
     end
   end
-
-  def self.fully_replicated(&_block)
-    old_fully_replicated = Thread.current['octopus.fully_replicated']
-    Thread.current['octopus.fully_replicated'] = true
-    yield
-  ensure
-    Thread.current['octopus.fully_replicated'] = old_fully_replicated
-  end
 end
 
-require 'octopus/shard_tracking'
-require 'octopus/shard_tracking/attribute'
-require 'octopus/shard_tracking/dynamic'
+require "octopus/shard_tracking"
+require "octopus/shard_tracking/attribute"
+require "octopus/shard_tracking/dynamic"
 
-require 'octopus/model'
-require 'octopus/migration'
-require 'octopus/association'
-require 'octopus/collection_association'
-require 'octopus/has_and_belongs_to_many_association' unless Octopus.rails41?
-require 'octopus/association_shard_tracking'
-require 'octopus/persistence'
-require 'octopus/log_subscriber'
-require 'octopus/abstract_adapter'
-require 'octopus/singular_association'
+require "octopus/model"
+require "octopus/migration"
+require "octopus/association"
+require "octopus/collection_association"
+require "octopus/association_shard_tracking"
+require "octopus/persistence"
+require "octopus/log_subscriber"
+require "octopus/abstract_adapter"
+require "octopus/singular_association"
 
-require 'octopus/railtie' if defined?(::Rails)
+if defined?(::Rails)
+  require "octopus/railtie"
+end
 
-require 'octopus/proxy'
-require 'octopus/collection_proxy'
-require 'octopus/relation_proxy'
-require 'octopus/scope_proxy'
+
+require "octopus/proxy"
+require "octopus/collection_proxy"
+require "octopus/relation_proxy"
+require "octopus/scope_proxy"

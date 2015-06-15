@@ -4,12 +4,14 @@ module ActiveRecord
       ConnectionAdapters::ModifyConfigAdapter.new(config)
     end
   end
-
+  
   module ConnectionAdapters
     class ModifyConfigAdapter < AbstractAdapter
+      
       def initialize(config)
         config.replace(config.symbolize_keys)
       end
+      
     end
   end
 end

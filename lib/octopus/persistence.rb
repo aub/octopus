@@ -25,7 +25,7 @@ module Octopus
         run_on_shard { super }
       end
 
-      def touch(*args)
+      def touch(name=nil)
         run_on_shard { super }
       end
 
