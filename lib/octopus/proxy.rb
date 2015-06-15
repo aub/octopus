@@ -370,9 +370,7 @@ module Octopus
         arg = ActiveRecord::Base::ConnectionSpecification.new(adapter.dup, config)
       end
 
-      pool = ActiveRecord::ConnectionAdapters::ConnectionPool.new(arg)
-      pool.connection
-      pool
+      ActiveRecord::ConnectionAdapters::ConnectionPool.new(arg)
     end
 
     def initialize_adapter(adapter)
